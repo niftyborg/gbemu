@@ -200,6 +200,25 @@ error:
     return err;
 }
 
+int tests_check_pass(void) {
+    return EXIT_SUCCESS;
+}
+
+void run_tests(struct sm83_test *tests, size_t count, void *gbm_state) {
+    printf("SM83 TESTS: RUNNING\n");
+    size_t success_count = 0;
+    for (int i = 0; i < count; i++) {
+        struct sm83_test current_test = tests[i];
+        int pass = tests_check_pass();
+        if (pass == 0) {
+            success_count++;
+            continue; // only show tests that failed
+        }
+        printf("\t[%s]: %s\n", current_test.name, pass ? "SUCCESS" : "FAILURE");
+    }
+    printf("SM83 RESULTS: %zu/%zu\n", success_count, count);
+}
+
 int main(void) {
 
     char* buffer = malloc(1 << 20);
@@ -221,6 +240,8 @@ int main(void) {
     assert (tests != NULL);
     sm83_test_dump(tests, tests_len);
 
+    run_tests(tests, tests_len, NULL);
+
     // TODO: Test File not in repo
     // FILE *fp = fopen("asdf.c8", "rb");
     // int bytesRead = fread(buffer, 1, 1<<20, fp);
@@ -230,5 +251,5 @@ int main(void) {
     /*     for (size_t i = 0; i < filenames_count; i++) free(filenames[i]); */
     /*     free (filenames); */
     /* } */
-    return 0;
+    return EXIT_SUCCESS;
 }

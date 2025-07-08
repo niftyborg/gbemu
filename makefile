@@ -15,11 +15,15 @@ endif
 
 build: skeleton gbemu
 
-gbemu: gbemu.o cjson.o jtest.o util.o
+gbemu: gbemu.o cjson.o jtest.o util.o instr.o
 	$(CC) $(CFLAGS) -o $(BUILD_DIR)/$@ $(BUILD_DIR)/objs/gbemu.o \
 		$(BUILD_DIR)/objs/cjson.o \
 		$(BUILD_DIR)/objs/jtest.o \
-		$(BUILD_DIR)/objs/util.o
+		$(BUILD_DIR)/objs/util.o \
+		$(BUILD_DIR)/objs/instr.o
+
+instr.o: src/instr.c
+	$(CC) $(CFLAGS) -c -o $(BUILD_DIR)/objs/$@ $<
 
 gbemu.o: src/main.c
 	$(CC) $(CFLAGS) -c -o $(BUILD_DIR)/objs/$@ $<

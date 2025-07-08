@@ -39,7 +39,8 @@ void ld(uint8_t instr, struct gbstate *s){
     }
 }
 
-
+void halt(){
+}
 
 
 void step(struct gbstate *s){

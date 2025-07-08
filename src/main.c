@@ -7,13 +7,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include <cJSON.h>
+#include <raylib.h>
 
 #include "util.h"
 #include "jtest.h"
 
 #define SM83_DIR "./sm83/v1/"
+#define WINDOW_TITLE "Game Boy Emulator"
+#define TARGET_FPS 10
+#define WIN_SCALE 5
 
 #define GBR_LEN 0x10000 /* 4096 */
 
@@ -34,6 +39,11 @@ struct gbstate {
     uint16_t sp;
     unsigned char reg[REG_LEN];
     unsigned char ram[GBR_LEN];
+};
+
+struct dim {
+    size_t h;
+    size_t w;
 };
 
 // BSS reserve
@@ -240,12 +250,18 @@ void run_tests(struct sm83_test *tests, size_t count, void *gbm_state) {
     printf("SM83 RESULTS: %zu/%zu\n", success_count, count);
 }
 
+void dump_rom(struct string *rom_data) {
+    for (size_t i = 0; i < rom_data->len; i++) {
+        if (isprint(rom_data->str[i]))
+            printf("%c", rom_data->str[i]);
+        else
+            printf(".");
+    }
+    printf("\n");
+}
+
 int main(void) {
-
-    char* buffer = malloc(1 << 20);
-    if (buffer == NULL)
-        return EXIT_FAILURE;
-
+#ifdef ONLY_TESTS
     char **filenames = calloc(1024, sizeof(char*));
     size_t filenames_count = 0;
     test_file_list (filenames, &filenames_count);
@@ -262,15 +278,48 @@ int main(void) {
     sm83_test_dump(tests, tests_len);
 
     run_tests(tests, tests_len, NULL);
+#else
+    // Game Boy screen: 160px across by 144px
+    struct dim vdim = { .w = 160, .h = 144 };
+    // physical screen
+    struct dim pdim = { .w = vdim.w * WIN_SCALE * 2, .h = vdim.h * WIN_SCALE };
 
-    // TODO: Test File not in repo
-    // FILE *fp = fopen("asdf.c8", "rb");
-    // int bytesRead = fread(buffer, 1, 1<<20, fp);
-    // printf("%x%x\n", buffer[0], buffer[1]);
-    /* if (buffer) free(buffer); */
-    /* if (filenames) { */
-    /*     for (size_t i = 0; i < filenames_count; i++) free(filenames[i]); */
-    /*     free (filenames); */
-    /* } */
+    struct string rom_data = {0};
+    assert (read_file("./roms/tetris.gb", &rom_data) == 0
+            && "Failed to load tetris rom");
+    /* dump_rom(&rom_data); */
+
+    InitWindow(pdim.w, pdim.h, WINDOW_TITLE);
+    SetTargetFPS(TARGET_FPS);
+    while (!WindowShouldClose()) {
+        /* update_input (&ctx); */
+        /* for (int i = 0; i < 10; i++) ops_dispatch(&ctx); */
+
+        BeginDrawing();
+        ClearBackground((Color) { .r = 0, .g = 0, .b = 0, .a = 255 });
+        // REGISTER VALUES
+        Vector2 text_pos = { .x = pdim.w/2, .y = 0 };
+        Vector2 reg_spacing = { .x = 60, .y = 20 };
+        for (size_t i = 0; i < REG_LEN; i++) {
+            size_t x_off = i % 6 * reg_spacing.x;
+            if (i % 6 == 0) text_pos.y += reg_spacing.y;
+            size_t font_size = reg_spacing.x;
+            DrawText(TextFormat("%02d: 0", i), text_pos.x + x_off, text_pos.y, 14, WHITE);
+        }
+        // INSTRUCTIONS
+        size_t curr_pos = 0;
+        text_pos = (Vector2) { .x = pdim.w/2, .y = pdim.h/2 };
+        Vector2 op_spacing = { .x = 60, .y = 20 };
+        for (size_t i = 0; curr_pos < rom_data.len && i < 20; curr_pos++, i++) {
+            size_t x_off = i % 6 * reg_spacing.x;
+            if (i % 6 == 0) text_pos.y += reg_spacing.y;
+            size_t font_size = reg_spacing.x;
+            DrawText(TextFormat("%02X", rom_data.str[curr_pos]), text_pos.x + x_off, text_pos.y, 14, WHITE);
+        }
+        EndDrawing();
+    }
+    CloseWindow();
+#endif // ONLY_TESTS
+
     return EXIT_SUCCESS;
 }

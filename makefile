@@ -1,6 +1,6 @@
 BUILD_DIR=./build
 CC=gcc
-CFLAGS=-I./include
+CFLAGS=-I./include -lraylib
 
 ifdef RELEASE
 	CFLAGS+=-O2

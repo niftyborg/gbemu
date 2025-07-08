@@ -61,7 +61,6 @@ struct gbstate test_gbstate_to_gbstate(struct test_gbstate s){
         } else if (strcmp(kv.k, "ime") == 0){
         } else {
             uint8_t reg_idx = key_to_idx[kv.k[0]];
-            printf("reg_idx : %x\n", reg_idx);
             to_ret.reg[reg_idx] = kv.v;
         }
     }
@@ -75,29 +74,17 @@ int verify_gbstate_with_test(struct test_gbstate s, struct gbstate s_hat){
         struct ram_state rs = r.states[i];
         mismatches += (s_hat.ram[rs.pos] != rs.val);
     }
-    if(mismatches){
-        printf("RAM MISMATCH!\n");
-    }
     struct kvs k = s.kvs;
     for(int i = 0; i < k.len; i++){
         struct gbs_kv kv = k.fields[i];
         if(strcmp(kv.k, "sp") == 0){
             mismatches += (s_hat.sp != kv.v);
-            if((s_hat.sp != kv.v)){
-                printf("SP MISMATCH!\n");
-            }
         } else if (strcmp(kv.k, "pc") == 0){
             mismatches += (s_hat.pc != kv.v);
-            if((s_hat.pc != kv.v)){
-                printf("PC MISMATCH!\n");
-            }
         } else if (strcmp(kv.k, "ime") == 0){
         } else {
             uint8_t reg_idx = key_to_idx[kv.k[0]];
             mismatches += (s_hat.reg[reg_idx] != kv.v);
-            if((s_hat.reg[reg_idx] != kv.v)){
-                printf("REG MISMATCH with reg %c!\n", kv.k[0]);
-            }
         }
     }
     return mismatches;
@@ -105,7 +92,7 @@ int verify_gbstate_with_test(struct test_gbstate s, struct gbstate s_hat){
 
 int run_sm83_test(struct sm83_test t){
 
-    struct gbstate s = test_gbstate_to_gbstate(t.final);
+    struct gbstate s = test_gbstate_to_gbstate(t.initial);
     // s = step(s, opcode)??
     // or maybe we can put the opcode in memory at the PC
     return verify_gbstate_with_test(t.final, s); // 0 = success

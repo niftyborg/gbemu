@@ -6,6 +6,18 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+void non_fatal_ (char *file, int line, char *level, char *msg, ...);
+
+#define info(...)                                               \
+    do {                                                        \
+        non_fatal_ (__FILE__, __LINE__, "INFO", __VA_ARGS__);   \
+    } while (0)
+
+#define error(...)                                              \
+    do {                                                        \
+        non_fatal_ (__FILE__, __LINE__, "ERROR", __VA_ARGS__);   \
+    } while (0)
+
 struct vec {
     unsigned char *items;
     size_t len;
@@ -19,10 +31,10 @@ struct string {
 };
 
 // Vec framework, implement functions in terms of your type
-inline void vec_reset       (struct vec *vec);
-inline int vec_append       (struct vec *vec, size_t item_size, void *val);
-inline int vec_pop          (struct vec *vec, size_t item_size, void *val);
-inline int vec_append_many  (struct vec *vec, size_t item_size, void *vals, size_t count);
+void vec_reset       (struct vec *vec);
+int vec_append       (struct vec *vec, size_t item_size, void *val);
+int vec_pop          (struct vec *vec, size_t item_size, void *val);
+int vec_append_many  (struct vec *vec, size_t item_size, void *vals, size_t count);
 
 // String, specialization of vec
 int string_appendn      (struct string *s, char *cs, size_t n);
@@ -33,6 +45,20 @@ void string_reset       (struct string *s);
 #endif // UTIL_H_
 
 #ifdef UTIL_IMPLEMENTATION
+#include <stdio.h>
+#include <stdarg.h>
+void
+non_fatal_ (char *file, int line, char *level, char *msg, ...)
+{
+    assert (msg);
+    va_list ap;
+    va_start (ap, msg);
+    fprintf (stderr, "%s:%d: %s: ", file, line, level);
+    vfprintf (stderr, msg, ap);
+    fprintf (stderr, "\n");
+    va_end (ap);
+}
+
 inline void
 vec_reset (struct vec *vec)
 {

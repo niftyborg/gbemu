@@ -1,5 +1,28 @@
 #ifndef JTEST_H_
 #define JTEST_H_
+#include <stdlib.h>
+
+#define GBR_LEN 0x10000 /* 4096 */
+
+enum REG_IDX {
+RA = 0,
+RF,
+RB,
+RC,
+RD,
+RE,
+RH,
+RL,
+REG_LEN,
+};
+
+struct gbstate {
+    uint16_t pc;
+    uint16_t sp;
+    unsigned char reg[REG_LEN];
+    unsigned char ram[GBR_LEN];
+};
+
 struct gbs_kv {
     // NOTE: Not all the initial state values are registers
     char *k;
@@ -23,15 +46,15 @@ struct rams {
     size_t cap;
 };
 
-struct gb_state {
+struct test_gbstate {
     struct kvs kvs;
     struct rams rams;
 };
 
 struct sm83_test {
     char *name;
-    struct gb_state initial;
-    struct gb_state final;
+    struct test_gbstate initial;
+    struct test_gbstate final;
 };
 
 void kvs_reset(struct kvs *kvs);
@@ -43,4 +66,5 @@ int rams_append(struct rams *rams, struct ram_state *val);
 int rams_pop(struct rams *rams, struct ram_state *val);
 
 void sm83_test_dump(struct sm83_test *tests, size_t tests_len);
+int run_sm83_test(struct sm83_test t);
 #endif // JTEST_H_

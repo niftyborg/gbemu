@@ -15,26 +15,8 @@
 
 #define SM83_DIR "./sm83/v1/"
 
-#define GBR_LEN 0x10000 /* 4096 */
 
-enum REG_IDX {
-RA = 0,
-RF,
-RB,
-RC,
-RD,
-RE,
-RH,
-RL,
-REG_LEN,
-};
 
-struct gbstate {
-    uint16_t pc;
-    uint16_t sp;
-    unsigned char reg[REG_LEN];
-    unsigned char ram[GBR_LEN];
-};
 
 // BSS reserve
 #define FILE_BUF_LEN 1024 * 1024
@@ -221,21 +203,17 @@ error:
     return err;
 }
 
-int tests_check_pass(void) {
-    return EXIT_SUCCESS;
-}
-
 void run_tests(struct sm83_test *tests, size_t count, void *gbm_state) {
     printf("SM83 TESTS: RUNNING\n");
     size_t success_count = 0;
     for (int i = 0; i < count; i++) {
         struct sm83_test current_test = tests[i];
-        int pass = tests_check_pass();
+        int pass = run_sm83_test(current_test);
         if (pass == 0) {
             success_count++;
             continue; // only show tests that failed
         }
-        printf("\t[%s]: %s\n", current_test.name, pass ? "SUCCESS" : "FAILURE");
+        // printf("\t[%s]: %s\n", current_test.name, pass ? "FAILURE" : "SUCCESS");
     }
     printf("SM83 RESULTS: %zu/%zu\n", success_count, count);
 }
@@ -257,20 +235,18 @@ int main(void) {
 
     struct sm83_test *tests = NULL;
     size_t tests_len = 0;
-    parse_file("./sm83/v1/00.json", &tests, &tests_len);
-    assert (tests != NULL);
-    sm83_test_dump(tests, tests_len);
+    for (size_t i = 0; i < filenames_count && i < 0x7F; i++){
+        char* file = malloc(strlen(SM83_DIR) + strlen(filenames[i]) + 1);
+        strcpy(file, SM83_DIR);
+        strcat(file, filenames[i]);
+        parse_file(file, &tests, &tests_len);
+        assert (tests != NULL);
+        printf("running test %s\n", filenames[i]);
+        // sm83_test_dump(tests, tests_len);
 
-    run_tests(tests, tests_len, NULL);
+        run_tests(tests, tests_len, NULL);
 
-    // TODO: Test File not in repo
-    // FILE *fp = fopen("asdf.c8", "rb");
-    // int bytesRead = fread(buffer, 1, 1<<20, fp);
-    // printf("%x%x\n", buffer[0], buffer[1]);
-    /* if (buffer) free(buffer); */
-    /* if (filenames) { */
-    /*     for (size_t i = 0; i < filenames_count; i++) free(filenames[i]); */
-    /*     free (filenames); */
-    /* } */
+    }
+
     return EXIT_SUCCESS;
 }

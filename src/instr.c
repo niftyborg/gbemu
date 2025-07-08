@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "jtest.h"
 #include "util.h"
@@ -51,7 +52,7 @@ void sub(uint8_t instr, struct gbstate *s) {
             error ("Unsupported sub instruction %02X", instr);
             assert(0);
     };
-    s->reg[RA] -= source;
+    s->reg[RA] -= source_reg;
 
     s->pc += 1;
 }

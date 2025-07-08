@@ -236,7 +236,7 @@ void dump_rom(struct string *rom_data) {
 }
 
 int main(void) {
-#ifdef ONLY_TESTS
+#ifdef RUN_TESTS
     char **filenames = calloc(1024, sizeof(char*));
     size_t filenames_count = 0;
     test_file_list (filenames, &filenames_count);

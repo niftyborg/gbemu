@@ -8,6 +8,10 @@ else
 	CFLAGS+=-ggdb
 endif
 
+ifdef RUN_TESTS
+	CFLAGS+=-DRUN_TESTS
+endif
+
 ifdef STRICT
 CFLAGS+=-Wall -Wextra -Wpedantic -Werror -fanalyzer -fstack-protector-strong \
 		-D_FORTIFY_SOURCE=2

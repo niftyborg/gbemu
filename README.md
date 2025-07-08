@@ -5,7 +5,9 @@
 Initialize git submodules
 
 ```console
-$ git submodule init
+$ git submodule update
+$ git submodule sync
+$ git submodule init sm83
 ```
 
 Manual build:

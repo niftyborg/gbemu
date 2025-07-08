@@ -9,7 +9,6 @@ static const int key_to_idx[256] = {
     ['a'] = 0, ['f'] = 1, ['b'] = 2, ['c'] = 3, ['d'] = 4, ['e'] = 5, ['h'] = 6, ['l'] = 7
 };
 
-
 void kvs_reset(struct kvs *kvs) {
     assert (kvs);
     vec_reset((struct vec*) kvs->fields);

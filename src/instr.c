@@ -4,10 +4,7 @@
 #include "jtest.h"
 #include "util.h"
 
-
 #define mop(instr, match, mask) ((instr & mask) == match)
-
-
 
 // 0 1 [x1 x2 x3] [y1 y2 y3]
 void ld(uint8_t instr, struct gbstate *s){
@@ -39,9 +36,7 @@ void ld(uint8_t instr, struct gbstate *s){
     }
 }
 
-void halt(){
-}
-
+void halt(){}
 
 void step(struct gbstate *s){
     uint8_t instr = s->ram[s->pc++];

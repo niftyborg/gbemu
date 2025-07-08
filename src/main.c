@@ -4,7 +4,7 @@
 #include <string.h>
 #include "cJSON.h"
 
-int main(){
+int main(void) {
 
     char* buffer = malloc(1 << 20);
     struct dirent *dir;
@@ -27,8 +27,9 @@ int main(){
     //     char* file_name = strcat("./sm83/v1", )
     // }
 
-    FILE *fp = fopen("asdf.c8", "rb");
-    int bytesRead = fread(buffer, 1, 1<<20, fp);
-    printf("%x%x\n", buffer[0], buffer[1]);
+    // TODO: Test File not in repo
+    // FILE *fp = fopen("asdf.c8", "rb");
+    // int bytesRead = fread(buffer, 1, 1<<20, fp);
+    // printf("%x%x\n", buffer[0], buffer[1]);
     return 0;
 }

@@ -1,3 +1,5 @@
-./main
-./main.dSYM/
-./build/
+main
+main.dSYM/
+build/
+sm83/
+.dumbjump

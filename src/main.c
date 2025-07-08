@@ -213,7 +213,7 @@ void run_tests(struct sm83_test *tests, size_t count, void *gbm_state) {
             success_count++;
             continue; // only show tests that failed
         }
-        printf("\t[%s]: %s\n", current_test.name, pass ? "FAILURE" : "SUCCESS");
+        // printf("\t[%s]: %s\n", current_test.name, pass ? "FAILURE" : "SUCCESS");
     }
     printf("SM83 RESULTS: %zu/%zu\n", success_count, count);
 }
@@ -235,11 +235,18 @@ int main(void) {
 
     struct sm83_test *tests = NULL;
     size_t tests_len = 0;
-    parse_file("./sm83/v1/00.json", &tests, &tests_len);
-    assert (tests != NULL);
-    sm83_test_dump(tests, tests_len);
+    for (size_t i = 0; i < filenames_count && i < 0x7F; i++){
+        char* file = malloc(strlen(SM83_DIR) + strlen(filenames[i]) + 1);
+        strcpy(file, SM83_DIR);
+        strcat(file, filenames[i]);
+        parse_file(file, &tests, &tests_len);
+        assert (tests != NULL);
+        printf("running test %s\n", filenames[i]);
+        // sm83_test_dump(tests, tests_len);
 
-    run_tests(tests, tests_len, NULL);
+        run_tests(tests, tests_len, NULL);
+
+    }
 
     return EXIT_SUCCESS;
 }

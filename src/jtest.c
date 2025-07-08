@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "jtest.h"
+#include "instr.h"
 #include "util.h"
 
 static const int key_to_idx[256] = {
@@ -91,10 +92,8 @@ int verify_gbstate_with_test(struct test_gbstate s, struct gbstate s_hat){
 }
 
 int run_sm83_test(struct sm83_test t){
-
     struct gbstate s = test_gbstate_to_gbstate(t.initial);
-    // s = step(s, opcode)??
-    // or maybe we can put the opcode in memory at the PC
+    step(&s);
     return verify_gbstate_with_test(t.final, s); // 0 = success
 }
 

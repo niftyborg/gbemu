@@ -7,7 +7,7 @@
 #define mop(instr, match, mask) ((instr & mask) == match)
 
 // 0 1 [x1 x2 x3] [y1 y2 y3]
-void ld(uint8_t instr, struct gbstate *s){
+void ld(uint8_t instr, struct gbstate *s) {
     uint8_t bits_to_reg_idx[] = {
         RB,
         RC,
@@ -36,9 +36,30 @@ void ld(uint8_t instr, struct gbstate *s){
     }
 }
 
-void halt(){}
+void sub(uint8_t instr, struct gbstate *s) {
+    uint8_t source_reg = 0;
+    switch (instr) {
+        case 0x90: { source_reg = s->reg[RB]; } break;
+        case 0x91: { source_reg = s->reg[RC]; } break;
+        case 0x92: { source_reg = s->reg[RD]; } break;
+        case 0x93: { source_reg = s->reg[RE]; } break;
+        case 0x94: { source_reg = s->reg[RH]; } break;
+        case 0x95: { source_reg = s->reg[RL]; } break;
+        /* case 0x96: assert(0 && "Unsupported sub istr"); // needs HL */
+        case 0x97: { source_reg = s->reg[RA]; } break;
+        default:
+            error ("Unsupported sub instruction %02X", instr);
+            assert(0);
+    };
+    s->reg[RA] -= source;
 
-void step(struct gbstate *s){
+    s->pc += 1;
+}
+
+
+void halt() {}
+
+void step(struct gbstate *s) {
     uint8_t instr = s->ram[s->pc++];
     if mop(instr, 0x76, 0xFF) halt();
     else if mop(instr, 0x40, 0xC0) ld(instr, s);

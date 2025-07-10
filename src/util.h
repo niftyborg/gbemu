@@ -18,6 +18,12 @@ void non_fatal_ (char *file, int line, char *level, char *msg, ...);
         non_fatal_ (__FILE__, __LINE__, "ERROR", __VA_ARGS__);   \
     } while (0)
 
+#define unreachable()                                                   \
+    do {                                                                \
+        fprintf (stderr, "%s:%d: %s\n", __FILE__, __LINE__, "UNREACHABLE"); \
+        abort ();                                                       \
+    } while (0)
+
 struct vec {
     unsigned char *items;
     size_t len;

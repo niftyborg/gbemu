@@ -93,7 +93,7 @@ int verify_gbstate_with_test(struct test_gbstate s, struct gbstate s_hat){
 
 int run_sm83_test(struct sm83_test t){
     struct gbstate s = test_gbstate_to_gbstate(t.initial);
-    step(&s);
+    dispatch_op (&s);
     return verify_gbstate_with_test(t.final, s); // 0 = success
 }
 

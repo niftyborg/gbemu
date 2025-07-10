@@ -210,19 +210,33 @@ error:
     return err;
 }
 
-void run_tests(struct sm83_test *tests, size_t count, void *gbm_state) {
-    printf("SM83 TESTS: RUNNING\n");
-    size_t success_count = 0;
+void
+run_test_group (struct sm83_test *tests, size_t count, size_t *success_count)
+{
+    size_t sc = 0;
     for (int i = 0; i < count; i++) {
         struct sm83_test current_test = tests[i];
-        int pass = run_sm83_test(current_test);
+        int pass = run_sm83_test (current_test);
         if (pass == 0) {
-            success_count++;
+            sc++;
             continue; // only show tests that failed
         }
-        // printf("\t[%s]: %s\n", current_test.name, pass ? "FAILURE" : "SUCCESS");
+        /* printf("\t[%s]: %s\n", current_test.name, pass ? "FAILURE" : "SUCCESS"); */
     }
-    printf("SM83 RESULTS: %zu/%zu\n", success_count, count);
+    *success_count = sc;
+}
+
+void
+run_tests (char *file_name, struct sm83_test *tests, size_t tests_len)
+{
+    size_t success_count;
+    success_count = 0;
+    printf ("==============================\n");
+    printf ("FILE TEST: %s\n", file_name);
+    printf ("------------------------------\n");
+    run_test_group (tests, tests_len, &success_count);
+    printf ("\t Result: %zu/%zu\n", success_count, tests_len);
+    printf ("\n");
 }
 
 void dump_rom(struct string *rom_data) {
@@ -237,28 +251,24 @@ void dump_rom(struct string *rom_data) {
 
 int main(void) {
 #ifdef RUN_TESTS
-    char **filenames = calloc(1024, sizeof(char*));
-    size_t filenames_count = 0;
-    test_file_list (filenames, &filenames_count);
-    qsort(filenames, filenames_count, sizeof(char*), cmp_str);
-
-    printf("Test Files\n");
-    for (size_t i = 0; i < filenames_count && i < 10; i++)
-        printf("%zu: %s\n", i, filenames[i]);
+    char **file_names = calloc(1024, sizeof(char*));
+    size_t file_names_count = 0;
+    test_file_list (file_names, &file_names_count);
+    qsort(file_names, file_names_count, sizeof(char*), cmp_str);
 
     struct sm83_test *tests = NULL;
     size_t tests_len = 0;
-    for (size_t i = 0; i < filenames_count && i < 0x7F; i++){
-        char* file = malloc(strlen(SM83_DIR) + strlen(filenames[i]) + 1);
-        strcpy(file, SM83_DIR);
-        strcat(file, filenames[i]);
-        parse_file(file, &tests, &tests_len);
-        assert (tests != NULL);
-        printf("running test %s\n", filenames[i]);
-        // sm83_test_dump(tests, tests_len);
+    char* file_path;
+    for (size_t i = 0; i < file_names_count && i < 0x7F; i++){
+        file_path = malloc(strlen(SM83_DIR) + strlen(file_names[i]) + 1);
+        assert (file_path && "Failed to allocate space for full path name");
 
-        run_tests(tests, tests_len, NULL);
+        sprintf (file_path, "%s%s", SM83_DIR, file_names[i]);
+        parse_file(file_path, &tests, &tests_len);
+        assert (tests != NULL && tests_len > 0 && "Failed to parse JSON");
+        run_tests(file_names[i], tests, tests_len);
 
+        free (file_path);
     }
 #else
     // Game Boy screen: 160px across by 144px
@@ -273,6 +283,7 @@ int main(void) {
 
     InitWindow(pdim.w, pdim.h, WINDOW_TITLE);
     SetTargetFPS(TARGET_FPS);
+    size_t curr_pos = 0;
     while (!WindowShouldClose()) {
         /* update_input (&ctx); */
         /* for (int i = 0; i < 10; i++) ops_dispatch(&ctx); */
@@ -289,7 +300,6 @@ int main(void) {
             DrawText(TextFormat("%02d: 0", i), text_pos.x + x_off, text_pos.y, 14, WHITE);
         }
         // INSTRUCTIONS
-        size_t curr_pos = 0;
         text_pos = (Vector2) { .x = pdim.w/2, .y = pdim.h/2 };
         Vector2 op_spacing = { .x = 60, .y = 20 };
         for (size_t i = 0; curr_pos < rom_data.len && i < 20; curr_pos++, i++) {
@@ -299,6 +309,7 @@ int main(void) {
             DrawText(TextFormat("%02X", rom_data.str[curr_pos]), text_pos.x + x_off, text_pos.y, 14, WHITE);
         }
         EndDrawing();
+        curr_pos++;
     }
     CloseWindow();
 #endif // ONLY_TESTS

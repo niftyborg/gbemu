@@ -1,26 +1,70 @@
 #ifndef JTEST_H_
 #define JTEST_H_
+#include <stdint.h>
 #include <stdlib.h>
 
 #define GBR_LEN 0x10000 /* 4096 */
 
-enum REG_IDX {
-RA = 0,
-RF,
-RB,
+enum GPR {
+RB = 0,
 RC,
 RD,
 RE,
 RH,
 RL,
-REG_LEN,
+RF,
+RA,
+GPR_LEN,
+};
+
+// Hardware Register Addresses
+enum HRA {
+HRA_JOYP = 0xFF00,
+HRA_SB,
+HRA_SC,
+HRA_DIV,
+HRA_TMA,
+HRA_TAC,
+HRA_IF = 0xFF0F,
+HRA_NR10,
+HRA_NR11,
+HRA_NR12,
+HRA_NR13,
+HRA_NR14,
+HRA_NR21 = 0xFF16,
+HRA_NR22,
+HRA_NR23,
+HRA_NR24,
+HRA_NR30 = 0xFF1A,
+HRA_NR31,
+HRA_NR32,
+HRA_NR33,
+HRA_NR34,
+HRA_NR41 = 0xFF20,
+HRA_NR42,
+HRA_NR43,
+HRA_NR44,
+HRA_NR50 = 0xFF24,
+HRA_NR51,
+HRA_NR52,
+HRA_WAVE_RAM = 0xFF30,
+HRA_WAVE_RAM_END = 0xFF3F,
+HRA_LCDC = 0xFF40,
+HRA_STAT,
+HRA_SCY,
+HRA_SCX,
+HRA_LY,
+// TODO: finish writing this out
+HRA_IE = 0xFFFF,
+HRA_LEN,
 };
 
 struct gbstate {
     uint16_t pc;
     uint16_t sp;
-    unsigned char reg[REG_LEN];
+    unsigned char reg[GPR_LEN];
     unsigned char ram[GBR_LEN];
+    size_t cycle;
 };
 
 struct gbs_kv {

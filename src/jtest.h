@@ -111,4 +111,6 @@ int rams_pop(struct rams *rams, struct ram_state *val);
 
 void sm83_test_dump(struct sm83_test *tests, size_t tests_len);
 int run_sm83_test(struct sm83_test t);
+
+int parse_file(char *file_path, struct sm83_test **sm83_tests, size_t *length);
 #endif // JTEST_H_

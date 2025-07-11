@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#define SM83_DIR "./sm83/v1/"
+
+#define FILE_BUF_LEN 1024 * 1024
+
 void non_fatal_ (char *file, int line, char *level, char *msg, ...);
 
 #define info(...)                                               \
@@ -48,11 +52,19 @@ int string_append       (struct string *s, char *cs);
 int string_append_char  (struct string *s, char c);
 void string_print_dbg   (struct string *s);
 void string_reset       (struct string *s);
+
+// IO
+int read_file (char *file_path, struct string *s);
+void dump_rom (struct string *rom_data);
 #endif // UTIL_H_
 
 #ifdef UTIL_IMPLEMENTATION
 #include <stdio.h>
 #include <stdarg.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 void
 non_fatal_ (char *file, int line, char *level, char *msg, ...)
 {
@@ -172,4 +184,37 @@ string_reset (struct string *s)
     /* memset (s->str, 0, s->cap); */
     vec_reset ((struct vec*) &s->str);
 }
+
+// WARN: not thread safe
+int read_file(char *file_path, struct string *s) {
+    static char file_buf[FILE_BUF_LEN + 1] = {0};
+
+    int err = 0;
+    int fd = open(file_path, O_RDONLY);
+    if (fd < 0) {
+        error ("Failed to read %s due to %s", file_path, strerror(errno));
+        err = 1;
+        goto error;
+    }
+
+    ssize_t n = 0;
+    while ((n = read(fd, file_buf, FILE_BUF_LEN)) > 0) {
+        string_appendn(s, file_buf, n);
+    }
+
+error:
+    if (fd >= 0) close(fd);
+    return err;
+}
+
+void dump_rom(struct string *rom_data) {
+    for (size_t i = 0; i < rom_data->len; i++) {
+        if (isprint(rom_data->str[i]))
+            printf("%c", rom_data->str[i]);
+        else
+            printf(".");
+    }
+    printf("\n");
+}
+
 #endif // COMMON_IMPLEMENTATION

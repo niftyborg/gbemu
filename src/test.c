@@ -12,7 +12,7 @@
 static int test_file_list(char **filenames, size_t *filecount);
 static void run_test_group_ (struct sm83_test *tests, size_t count,
                      size_t *success_count);
-static void run_test_group (char *file_name, struct sm83_test *tests,
+static int run_test_group (char *file_name, struct sm83_test *tests,
                             size_t tests_len);
 
 int cmp_str (const void *a, const void *b) {
@@ -30,14 +30,16 @@ run_tests (void)
     struct sm83_test *tests = NULL;
     size_t tests_len = 0;
     char* file_path;
-    for (size_t i = 0; i < file_names_count && i < 0x7F; i++){
+    size_t sc_count = 0;
+    for (size_t i = 0; i < file_names_count; i++){
         file_path = malloc(strlen(SM83_DIR) + strlen(file_names[i]) + 1);
         assert (file_path && "Failed to allocate space for full path name");
 
         sprintf (file_path, "%s%s", SM83_DIR, file_names[i]);
         parse_file (file_path, &tests, &tests_len);
         assert (tests != NULL && tests_len > 0 && "Failed to parse JSON");
-        run_test_group (file_names[i], tests, tests_len);
+        sc_count += run_test_group (file_names[i], tests, tests_len);
+        /* info ("Completed %zu/%zu", sc_count, file_names_count); */
 
         free (file_path);
     }
@@ -57,7 +59,8 @@ run_test (char *test_name)
     size_t tests_len = 0;
     char* file_path;
     char* file_name;
-    for (size_t i = 0; i < file_names_count && i < 0x7F; i++){
+    size_t completed_count = 0;
+    for (size_t i = 0; i < file_names_count; i++){
         file_name = file_names[i];
         if (file_name != NULL && strstr (file_name, test_name) == NULL)
             continue;
@@ -68,23 +71,26 @@ run_test (char *test_name)
         sprintf (file_path, "%s%s", SM83_DIR, file_names[i]);
         parse_file(file_path, &tests, &tests_len);
         assert (tests != NULL && tests_len > 0 && "Failed to parse JSON");
-        run_test_group (file_names[i], tests, tests_len);
+        completed_count += run_test_group (file_names[i], tests, tests_len);
 
         free (file_path);
     }
 }
 
-void
+int
 run_test_group (char *file_name, struct sm83_test *tests, size_t tests_len)
 {
     size_t success_count;
     success_count = 0;
-    printf ("==============================\n");
-    printf ("FILE TEST: %s\n", file_name);
-    printf ("------------------------------\n");
     run_test_group_ (tests, tests_len, &success_count);
-    printf ("\t Result: %zu/%zu\n", success_count, tests_len);
-    printf ("\n");
+    if (success_count < 1000 || show_completed == 1) {
+        printf ("==============================\n");
+        printf ("FILE TEST: %s\n", file_name);
+        printf ("------------------------------\n");
+        printf ("\t Result: %zu/%zu\n", success_count, tests_len);
+        printf ("\n");
+    }
+    return success_count > 0 ? 1 : 0;
 }
 
 static int
@@ -116,6 +122,7 @@ static void
 run_test_group_ (struct sm83_test *tests, size_t count, size_t *success_count)
 {
     size_t sc = 0;
+    size_t shown = 0;
     for (size_t i = 0; i < count; i++) {
         struct sm83_test current_test = tests[i];
         int pass = run_sm83_test (current_test);
@@ -123,7 +130,10 @@ run_test_group_ (struct sm83_test *tests, size_t count, size_t *success_count)
             sc++;
             continue; // only show tests that failed
         }
-        /* printf("\t[%s]: %s\n", current_test.name, pass ? "FAILURE" : "SUCCESS"); */
+        if (shown < show_individual && pass != 0) {
+            shown++;
+            printf("\t[%s]: %s\n", current_test.name, pass ? "FAILURE" : "SUCCESS");
+        }
     }
     *success_count = sc;
 }

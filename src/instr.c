@@ -3,22 +3,95 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
+/* #include <signal.h> */
 
 #include "util.h"
 
 #define mop(instr, match, mask) ((instr & mask) == match)
 // Intruction Internals
 #define II static inline
+/* #define II */
+/* #define unreachable() */
 
 static int dispatch_op_word (struct gbstate *ctx);
 static int dispatch_op_dword (struct gbstate *ctx);
+
+II uint8_t
+set_bit (uint8_t byte, uint8_t bidx, uint8_t val)
+{
+        assert (val == 0 || val == 1 && "Bit value must be 0 or 1");
+        uint8_t left = (byte >> (bidx + 1));
+        left <<= (bidx + 1);
+        uint8_t right = (byte << (8 - bidx));
+        right >>= 8 - bidx;
+        return (uint8_t) (left | (val << bidx) | right);
+}
+
+II uint8_t
+get_bit (uint8_t byte, uint8_t bidx)
+{
+        uint8_t val = (byte << (bidx - 1)) & 0xFF;
+        val >>= 7;
+        assert (val == 0 || val == 1 && "Bit value must be 0 or 1");
+        return val;
+}
+
+II uint8_t
+flip_bit (uint8_t byte, uint8_t bidx)
+{
+        uint8_t left = (byte >> (bidx + 1));
+        left <<= (bidx + 1);
+        uint8_t right = (byte << (8 - bidx));
+        right >>= 8 - bidx;
+        uint8_t val = ~get_bit (byte, bidx) & 0x01;
+        assert (val == 0 || val == 1 && "Bit value must be 0 or 1");
+        return (uint8_t) (left | (val << bidx) | right);
+}
+
+II uint8_t
+get_flag (struct gbstate *ctx, enum BFLAGS bf)
+{
+        return get_bit (ctx->reg[RF], bf);
+}
+
+II void
+set_flag (struct gbstate *ctx, enum BFLAGS bf, uint8_t bv)
+{
+        ctx->reg[RF] = set_bit (ctx->reg[RF], bf, bv);
+}
+
+II void
+flip_flag (struct gbstate *ctx, enum BFLAGS bf)
+{
+        ctx->reg[RF] = flip_bit (ctx->reg[RF], bf);
+}
+
+II uint8_t
+imm8 (struct gbstate *ctx)
+{
+        return ctx->ram[ctx->pc + 1];
+}
+
+II uint16_t
+imm16 (struct gbstate *ctx)
+{
+        uint16_t l = ctx->ram[ctx->pc + 1];
+        uint16_t h = ctx->ram[ctx->pc + 2];
+        return (h << 8) | l;
+}
+
+II uint8_t
+mem8 (struct gbstate *ctx, uint16_t addr)
+{
+        return ctx->ram[addr];
+}
 
 // 0 false, non-zero false
 // low: if true, check lsbits, else check msbits
 II int
 inrange_ (uint8_t val, uint8_t lb, uint8_t ub, uint8_t linear)
 {
-        uint8_t mask = 0;
+        uint8_t mask = 0xFF;
         uint8_t shift = 0;
         if (!linear) {
                 mask = 0xF0;
@@ -131,7 +204,7 @@ dispatch_op (struct gbstate *ctx)
                         return 1;
                 } break;
                 case 0xCB: {
-                        err = dispatch_op_dword (ctx);
+                        /* err = dispatch_op_dword (ctx); */
                 } break;
                 default: {
                         err = dispatch_op_word (ctx);
@@ -370,49 +443,240 @@ dispatch_op_word (struct gbstate *ctx)
 static int
 dispatch_op_dword (struct gbstate *ctx)
 {
+        uint8_t op = ctx->ram[ctx->pc];
+        error ("Unsupported dword op: %02X", op);
         unreachable ();
 }
 
 int
 add (struct gbstate *ctx)
 {
-        unreachable ();
+        struct cpc co = {0};
+        int err = 0;
+        uint8_t op = ctx->ram[ctx->pc];
+        enum GPR gpr = 0;
+        enum GPR gpr_h = 0;
+        enum GPR gpr_l = 0;
+        uint8_t a1 = 0;
+        uint8_t a2 = 0;
+        uint8_t a3 = 0;
+        uint8_t a4 = 0;
+        uint16_t aa1 = 0;
+        uint16_t aa2 = 0;
+        uint16_t aa3 = 0;
+        uint32_t vv1 = 0;
+        uint32_t vv2 = 0;
+        uint32_t vv3 = 0;
+        if (mop (op, 0x09, 0x0F) && inrangev (op, 0x0, 0x3)) { // 0x09-0x39
+                udo (&co, 1, 2);
+                gpr_h = ((op & 0xF0) >> 4) * 2;
+                gpr_l = gpr_h + 1;
+                vv1 = rpair (ctx, gpr_h, gpr_l);
+                vv2 = rpair (ctx, RH, RL);
+                vv3 = vv2 + vv1;
+                a1 = (uint8_t) ((vv3 & 0x10000) >> 16);
+                aa1 = vv3;
+                /* info ("BC: %d, HL: %d, RF: %d", vv1, vv2, ctx->reg[RF]); */
+                // BCD check
+                a2 = ctx->reg[gpr_l] & 0x0F;
+                a3 = ctx->reg[RL] & 0x0F;
+                a2 += a3;
+                a2 = (a2 & 0x10) >> 4;
+                // set values
+                spair (ctx, RH, RL, aa1);
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_C, a1);
+                set_flag (ctx, BF_H, a2);
+                /* info ("BC: %d, HL: %d, RF: %d", vv1, aa1, ctx->reg[RF]); */
+        }
+        else if (inrange (op, 0x80, 0x87)) {
+                udo (&co, 1, 1);
+                // Addition
+                gpr = op & 0x0F;
+                aa1 = ctx->reg[RA];
+                aa1 += ctx->reg[gpr];
+                a1 = (aa1 & 0x100) >> 8;
+                // BCD check
+                a2 = ctx->reg[RA] & 0x0F;
+                a3 = ctx->reg[gpr] & 0x0f;
+                a2 += a3;
+                a2 = (a2 & 0x10) >> 4;
+                // Set values
+                ctx->reg[RA] = aa1;
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_C, a1);
+                set_flag (ctx, BF_Z, (aa1 & 0xFF) == 0 ? 1 : 0);
+                set_flag (ctx, BF_H, a2);
+        }
+        else if (inrange (op, 0x88, 0x8F)) {
+                udo (&co, 1, 1);
+                // Addition
+                gpr = (op & 0x0F) - 0x08;
+                aa1 = ctx->reg[RA];
+                aa1 += ctx->reg[gpr];
+                aa1 += get_flag (ctx, BF_C);
+                a1 = (aa1 & 0x100) >> 8;
+                // BCD check
+                a2 = ctx->reg[RA] & 0x0F;
+                a3 = ctx->reg[gpr] & 0x0F;
+                a2 += a3 + get_flag (ctx, BF_C);
+                a2 = (a2 & 0x10) >> 4;
+                // Set values
+                ctx->reg[RA] = aa1;
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_C, a1);
+                set_flag (ctx, BF_Z, (aa1 & 0xFF) == 0 ? 1 : 0);
+                set_flag (ctx, BF_H, a2);
+        }
+        else {
+                error ("Unsupported instruction: %02X", op);
+                unreachable ();
+                err = 1;
+        }
+
+        if (err == 0) {
+                ctx->pc += co.po;
+                ctx->cycle += co.cd;
+        }
+        return err;
 }
 
 int
 and (struct gbstate *ctx)
 {
-        unreachable ();
+        assert (ctx);
+        int err = 0;
+        uint8_t op = ctx->ram[ctx->pc];
+        uint8_t gpr = 0;
+        uint8_t a1 = 0;
+        uint16_t aa1 = 0;
+        struct cpc co = {0};
+
+        switch (op) {
+                case 0xA6:
+                        udo (&co, 1, 2);
+                        aa1 = rpair (ctx, RH, RL);
+                        a1 = mem8 (ctx, aa1) & ctx->reg[RA];
+                        ctx->reg[RA] = a1;
+                        goto and_;
+                case 0xE6:
+                        udo (&co, 2, 2);
+                        a1 = imm8 (ctx) & ctx->reg[RA];
+                        ctx->reg[RA] = a1;
+                        goto and_;
+        }
+
+        if (inrange (op, 0xA0, 0xA7)) {
+                udo (&co, 1, 1);
+                gpr = op & 0x0F;
+                a1 = ctx->reg[gpr] & ctx->reg[RA];
+                ctx->reg[RA] = a1;
+        }
+and_:
+        if (err == 0) {
+                ctx->pc += co.po;
+                ctx->cycle += co.cd;
+                set_flag (ctx, BF_Z, a1 == 0 ? 1 : 0);
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_H, 1);
+                set_flag (ctx, BF_C, 0);
+        }
+        return err;
 }
 
 int
 call (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 ccf (struct gbstate *ctx)
 {
-        unreachable ();
+        flip_flag (ctx, BF_C);
+        set_flag (ctx, BF_N, 0);
+        set_flag (ctx, BF_H, 0);
+        ctx->pc += 1;
+        ctx->cycle += 1;
+        return 0;
 }
 
 int
 cp (struct gbstate *ctx)
 {
-        unreachable ();
+        assert (ctx);
+        int err = 0;
+        uint8_t op = ctx->ram[ctx->pc];
+        uint8_t gpr = 0;
+        uint8_t a1 = 0;
+        uint8_t a2 = 0;
+        uint8_t a3 = 0;
+        uint16_t aa1 = 0;
+        struct cpc co = {0};
+
+        switch (op) {
+                case 0xAE:
+                        /* udo (&co, 1, 2); */
+                        /* aa1 = rpair (ctx, RH, RL); */
+                        /* a1 = mem8 (ctx, aa1) ^ ctx->reg[RA]; */
+                        /* ctx->reg[RA] = a1; */
+                        /* goto op_done_; */
+                        unreachable ();
+                case 0xEE:
+                        /* udo (&co, 2, 2); */
+                        /* a1 = imm8 (ctx) ^ ctx->reg[RA]; */
+                        /* ctx->reg[RA] = a1; */
+                        /* goto op_done_; */
+                        unreachable ();
+        }
+
+        if (inrange (op, 0xB8, 0xBF)) {
+                udo (&co, 1, 1);
+                gpr = (op & 0x0F) - 0x08;
+                aa1 = ctx->reg[gpr];
+                aa1 = ~aa1 + 1;
+                aa1 += ctx->reg[RA];
+                aa1 = aa1 & 0x100 > 0 ? ~(aa1-1) : aa1; // back to unsigned
+                a1 = aa1;
+                // BCD check
+                a2 = ctx->reg[gpr] & 0x0F;
+                a3 += ctx->reg[RA] & 0x0F;
+                a2 = a3 + (~a2 + 1);
+                a2 = (a2 & 0x10) >> 4;
+                // Cy check
+                a3 = (aa1 & 0x100) >> 8;
+        }
+op_done_:
+        if (err == 0) {
+                ctx->pc += co.po;
+                ctx->cycle += co.cd;
+                set_flag (ctx, BF_Z, a1 == 0 ? 1 : 0);
+                set_flag (ctx, BF_N, 1);
+                set_flag (ctx, BF_H, a2);
+                set_flag (ctx, BF_C, a3);
+                /* info ("RF: %d", ctx->reg[RF]); */
+        }
+        return err;
 }
 
 int
 cpl (struct gbstate *ctx)
 {
-        unreachable ();
+        ctx->reg[RA] = ~ctx->reg[RA];
+        set_flag (ctx, BF_N, 1);
+        set_flag (ctx, BF_H, 1);
+        ctx->pc += 1;
+        ctx->cycle += 1;
+        return 0;
 }
 
 int
 daa (struct gbstate *ctx)
 {
-        unreachable ();
+        (void)ctx;
+        /* unreachable (); */
+        return 0; // TODO: later
 }
 
 int
@@ -424,7 +688,7 @@ dec (struct gbstate *ctx)
         enum GPR gpr = 0;
         enum GPR gpr_h = 0;
         enum GPR gpr_l = 0;
-        uint8_t a1 = 0;
+        /* uint8_t a1 = 0; */
         uint16_t aa1 = 0;
 
         switch (op) {
@@ -433,6 +697,7 @@ dec (struct gbstate *ctx)
                         aa1 = rpair (ctx, RH, RL);
                         ctx->ram[aa1]--;
                         // TODO: handle flags
+                        ctx->reg[RF] = set_bit (ctx->reg[RF], BF_N, 1);
                         goto processed_instruction;
                 case 0x3B:
                         udo (&co, 1, 2);
@@ -443,8 +708,9 @@ dec (struct gbstate *ctx)
         if (mop (op, 0x04, 0x0F) && inrange (op, 0x0, 0x2)) { // 0x04-0x24
                 udo (&co, 1, 2);
                 gpr = ((op & 0xF0) >> 4) * 2;
-                // TODO: handle flags
                 ctx->reg[gpr] -= 1;
+                // TODO: handle flags
+                ctx->reg[RF] = set_bit (ctx->reg[RF], BF_N, 1);
         }
         else if (mop (op, 0x0B, 0x0F) && inrangev (op, 0x0, 0x2)) { // 0x0B-0x2B
                 // WHY: GPR - B * 2 => [GPR + 0 = GPR_H, GPR + 1 = GPR_L]
@@ -457,8 +723,9 @@ dec (struct gbstate *ctx)
         else if (mop (op, 0x0D, 0x0F) && inrange (op, 0x0, 0x3)) { // 0x0D-0x3D
                 udo (&co, 1, 1);
                 gpr = RC + ((op & 0xF0) >> 4) * 2;
-                // TODO: handle flags
                 ctx->reg[gpr] -= 1;
+                // TODO: handle flags
+                ctx->reg[RF] = set_bit (ctx->reg[RF], BF_N, 1);
         }
 
 processed_instruction:
@@ -472,19 +739,60 @@ processed_instruction:
 int
 di (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 ei (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 halt (struct gbstate *ctx)
 {
-        unreachable ();
+        (void)ctx;
+        /* unreachable (); */
+        return 0; // TODO: later
+}
+
+inline uint8_t
+check_overflow (uint8_t byte)
+{
+    uint8_t t = byte << 7;
+    return t >> 7;
+}
+
+inline uint8_t
+check_underflow (uint8_t byte)
+{
+    uint8_t t = byte >> 7;
+    return t;
+}
+
+// Wrapping addition without branching
+uint8_t
+wrapping_add (uint8_t a, uint8_t b, uint8_t *out)
+{
+    uint16_t c = a + b;
+    uint8_t ch = (c & 0xFF00) >> 8;
+    uint8_t cl = c & 0x00FF;
+    *out = cl;
+    return ch;
+}
+
+// Wrapping substraction without branching
+uint8_t
+wrapping_sub (uint8_t a, uint8_t b, uint8_t *out)
+{
+    uint16_t c = (((uint16_t) a) << 8) - (((uint16_t) b) << 8);
+    uint8_t ch = (c & 0xFF00) >> 8;
+    uint8_t cl = c & 0x00FF;
+    uint8_t cf = check_underflow (cl);
+    *out = ch + (cl * cf);
+    return !cf;
 }
 
 int
@@ -497,7 +805,10 @@ inc (struct gbstate *ctx)
         enum GPR gpr_h = 0;
         enum GPR gpr_l = 0;
         uint8_t a1 = 0;
+        uint8_t a2 = 0;
+        uint8_t a3 = 0;
         uint16_t aa1 = 0;
+        uint16_t aa2 = 0;
 
         switch (op) {
                 case 0x33:
@@ -507,8 +818,17 @@ inc (struct gbstate *ctx)
                 case 0x34:
                         udo (&co, 1, 3);
                         aa1 = rpair (ctx, RH, RL);
-                        ctx->ram[aa1]++;
-                        // TODO: handle flags
+                        aa2 = ctx->ram[aa1];
+                        aa2++;
+                        // Check BCD
+                        a2 = ctx->ram[aa1] & 0x0F;
+                        a2 += 1;
+                        a2 = (a2 & 0x10) >> 4;
+                        // Set values
+                        ctx->ram[aa1] = aa2;
+                        set_flag (ctx, BF_Z, (aa2 & 0xFF) == 0 ? 1 : 0);
+                        set_flag (ctx, BF_N, 0);
+                        set_flag (ctx, BF_H, a2);
                         goto processed_instruction;
         }
 
@@ -520,17 +840,37 @@ inc (struct gbstate *ctx)
                 aa1 = rpair (ctx, gpr_h, gpr_l);
                 spair (ctx, gpr_h, gpr_l, aa1 + 1);
         }
-        else if (mop (op, 0x04, 0x0F) && inrange (op, 0x0, 0x2)) { // 0x04-0x24
+        else if (mop (op, 0x04, 0x0F) && inrangev (op, 0x0, 0x2)) { // 0x04-0x24
                 udo (&co, 1, 2);
                 gpr = ((op & 0xF0) >> 4) * 2;
-                // TODO: handle flags
-                ctx->reg[gpr] += 1;
+                // set values
+                aa1 = ctx->reg[gpr] + 1;
+                // Check BCD
+                a1 = (ctx->reg[gpr] & 0x0F) + 1;
+                a1 = (a1 & 0x10) >> 4;
+                // Set values
+                ctx->reg[gpr] = aa1;
+                set_flag (ctx, BF_Z, (aa1 & 0xFF) == 0 ? 1 : 0);
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_H, a1);
         }
-        else if (mop (op, 0x0D, 0x0F) && inrange (op, 0x0, 0x3)) { // 0x0D-0x3D
+        else if (mop (op, 0x0C, 0x0F) && inrangev (op, 0x0, 0x3)) { // 0x0C-0x3C
                 udo (&co, 1, 1);
                 gpr = RC + ((op & 0xF0) >> 4) * 2;
-                // TODO: handle flags
-                ctx->reg[gpr] += 1;
+                // set values
+                aa1 = ctx->reg[gpr] + 1;
+                // Check BCD
+                a1 = (ctx->reg[gpr] & 0x0F) + 1;
+                a1 = (a1 & 0x10) >> 4;
+                // Set values
+                ctx->reg[gpr] = aa1;
+                set_flag (ctx, BF_Z, (aa1 & 0xFF) == 0 ? 1 : 0);
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_H, a1);
+        }
+        else {
+                error ("Unsupported instruction: %02X", op);
+                unreachable ();
         }
 
 processed_instruction:
@@ -544,39 +884,57 @@ processed_instruction:
 int
 jp (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 jr (struct gbstate *ctx)
 {
-        unreachable ();
-}
+        int err = 0;
+        struct cpc co = {0};
+        uint8_t op = ctx->ram[ctx->pc];
+        uint8_t a1 = 0;
 
-II uint8_t
-imm8 (struct gbstate *ctx)
-{
-        return ctx->ram[ctx->pc + 1];
-}
-
-II uint16_t
-imm16 (struct gbstate *ctx)
-{
-        uint16_t l = ctx->ram[ctx->pc + 1];
-        uint16_t h = ctx->ram[ctx->pc + 2];
-        return (h << 8) | l;
-}
-
-II uint8_t
-mem8 (struct gbstate *ctx, uint16_t addr)
-{
-        return ctx->ram[addr];
+        if ((mop (op, 0x00, 0x0F) && inrangev (op, 0x2, 0x3)) // 0x20 - 0x21
+                || (mop (op, 0x08, 0x0F) && inrangev (op, 0x2, 0x3))) { // 0x28-38
+                enum BFLAGS bf = BF_C;
+                uint8_t cv = 1;
+                if (mop (op, 0x20, 0xF0)) {
+                        bf = BF_Z;
+                }
+                if (mop (op, 0x00, 0x0F)) {
+                        cv = 0;
+                }
+                a1 = imm8 (ctx);
+                if (get_flag (ctx, bf) == cv) {
+                        ctx->pc += 2;
+                        ctx->cycle += 2;
+                }
+                else {
+                        ssize_t t = ctx->pc + (int8_t) a1;
+                        ctx->pc = t + 2;
+                        ctx->cycle += 3;
+                }
+        }
+        else if (op == 0x18) {
+                a1 = imm8 (ctx);
+                ssize_t t = ctx->pc + (int8_t) a1;
+                ctx->pc = t + 2;
+                ctx->cycle += 3;
+        }
+        else {
+                error ("Unsupported instruction: %02X", op);
+                unreachable ();
+                err = 1;
+        }
+        return err;
 }
 
 II void
-ld_r16 (struct gbstate *ctx, enum GPR dl, enum GPR dr, enum GPR sr)
+ld_m16r8 (struct gbstate *ctx, enum GPR dh, enum GPR dl, enum GPR sr)
 {
-        uint16_t pos = rpair (ctx, dl, dr);
+        uint16_t pos = rpair (ctx, dh, dl);
         ctx->ram[pos] = ctx->reg[sr];
 }
 
@@ -590,7 +948,7 @@ II void
 ld_r8m8 (struct gbstate *ctx, enum GPR d)
 {
         uint16_t s = rpair (ctx, RH, RL);
-        ctx->reg[s] = ctx->ram[s];
+        ctx->reg[d] = ctx->ram[s];
 }
 
 II void
@@ -603,9 +961,7 @@ II void
 ld_imm16 (struct gbstate *ctx, enum GPR dh, enum GPR dl)
 {
         uint16_t v = imm16 (ctx);
-        uint16_t pair = rpair (ctx, dh, dl);
-        pair = v;
-        spair (ctx, dh, dl, pair);
+        spair (ctx, dh, dl, v);
 }
 
 int
@@ -617,7 +973,7 @@ ld (struct gbstate *ctx)
         uint16_t pair = 0;
         uint8_t gpr = 0;
         uint8_t a1 = 0; // temporary values
-        uint8_t a2 = 0;
+        /* uint8_t a2 = 0; */
         uint16_t aa1 = 0;
         int8_t s1 = 0;
 
@@ -641,22 +997,22 @@ ld (struct gbstate *ctx)
                         goto processed_instruction;
                 case 0x02:
                         udo (&co, 1, 2);
-                        ld_r16 (ctx, RB, RC, RA);
+                        ld_m16r8 (ctx, RB, RC, RA);
                         goto processed_instruction;
                 case 0x12:
                         udo (&co, 1, 2);
-                        ld_r16 (ctx, RD, RE, RA);
+                        ld_m16r8 (ctx, RD, RE, RA);
                         goto processed_instruction;
                 case 0x22:
                         udo (&co, 1, 2);
-                        ld_r16 (ctx, RH, RL, RA);
+                        ld_m16r8 (ctx, RH, RL, RA);
                         // NOTE: docs unclear, but increment should happen after changing state (most likely the expected behavior by user)
                         pair = rpair (ctx, RH, RL);
                         spair (ctx, RH, RL, pair + 1);
                         goto processed_instruction;
                 case 0x32:
                         udo (&co, 1, 2);
-                        ld_r16 (ctx, RH, RL, RA);
+                        ld_m16r8 (ctx, RH, RL, RA);
                         // TODO: underflow check?
                         pair = rpair (ctx, RH, RL);
                         spair (ctx, RH, RL, pair - 1);
@@ -685,7 +1041,7 @@ ld (struct gbstate *ctx)
                         a1 = ctx->sp & 0x00FF;
                         ctx->ram[aa1] = a1;
                         a1 = (ctx->sp & 0xFF00) >> 8;
-                        ctx->ram[aa1] = a1;
+                        ctx->ram[aa1 + 1] = a1;
                         goto processed_instruction;
                 case 0x0A:
                         udo (&co, 1, 2);
@@ -830,7 +1186,6 @@ ld (struct gbstate *ctx)
                         unreachable ();
         };
 
-        uint8_t op_idx = 0;
         // ranges
         if (inrange (op, 0x40, 0x47)) {
                 udo (&co, 1, 1);
@@ -886,70 +1241,225 @@ int
 nop (struct gbstate *ctx)
 {
         ctx->pc++;
+        ctx->cycle++;
+        return 0;
 }
 
 int
 or (struct gbstate *ctx)
 {
-        unreachable ();
+        assert (ctx);
+        int err = 0;
+        uint8_t op = ctx->ram[ctx->pc];
+        uint8_t gpr = 0;
+        uint8_t a1 = 0;
+        uint16_t aa1 = 0;
+        struct cpc co = {0};
+
+        switch (op) {
+                case 0xB6:
+                        udo (&co, 1, 2);
+                        aa1 = rpair (ctx, RH, RL);
+                        a1 = mem8 (ctx, aa1) | ctx->reg[RA];
+                        ctx->reg[RA] = a1;
+                        goto op_done_;
+                case 0xF6:
+                        udo (&co, 2, 2);
+                        a1 = imm8 (ctx) | ctx->reg[RA];
+                        ctx->reg[RA] = a1;
+                        goto op_done_;
+        }
+
+        if (inrange (op, 0xB0, 0xB7)) {
+                udo (&co, 1, 1);
+                gpr = op & 0x0F;
+                a1 = ctx->reg[gpr] | ctx->reg[RA];
+                ctx->reg[RA] = a1;
+        }
+op_done_:
+        if (err == 0) {
+                ctx->pc += co.po;
+                ctx->cycle += co.cd;
+                set_flag (ctx, BF_Z, a1 == 0 ? 1 : 0);
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_H, 0);
+                set_flag (ctx, BF_C, 0);
+        }
+        return err;
 }
 
 int
 pop (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 push (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 ret (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 rol (struct gbstate *ctx)
 {
-        unreachable ();
+        struct cpc co = {0};
+        int err = 0;
+        uint8_t a1 = 0;
+        uint8_t a2 = 0;
+        uint8_t op = ctx->ram[ctx->pc];
+        uint16_t aa1 = 0;
+
+        if (op == 0x07) {
+                udo (&co, 1, 1);
+                a1 = ctx->reg[RA];
+                a2 = ((a1 & 0x80) >> 7) & 0x01;
+                a1 = (a1 << 1 | a2);
+                ctx->reg[RA] = a1;
+                ctx->reg[RF] = 0;
+                set_flag (ctx, BF_C, a2);
+        }
+        else if (op == 0x17) {
+                udo (&co, 1, 1);
+                aa1 = ctx->reg[RA] << 1;
+                a1 = (aa1 & 0x100) >> 8;
+                a2 = (ctx->reg[RF] & (1 << BF_C));
+                a2 = a2 >> BF_C;
+                aa1 = (aa1 + a2) & 0xFF;
+                ctx->reg[RF] = 0;
+                ctx->reg[RF] = set_bit (ctx->reg[RF], BF_C, a1);
+                ctx->reg[RA] = aa1;
+        }
+        else {
+                error ("Op code: %02X", op);
+                unreachable ();
+                err = 1;
+        }
+        if (err == 0) {
+                ctx->pc += co.po;
+                ctx->cycle += co.cd;
+        }
+        return err;
 }
 
 int
 ror (struct gbstate *ctx)
 {
-        unreachable ();
+        struct cpc co = {0};
+        int err = 0;
+        uint8_t a1 = 0;
+        uint8_t a2 = 0;
+        uint8_t a3 = 0;
+        uint8_t op = ctx->ram[ctx->pc];
+
+        if (op == 0x0F) {
+                udo (&co, 1, 1);
+                a1 = ctx->reg[RA] & 0x01;
+                a2 = ctx->reg[RA] >> 1;
+                ctx->reg[RF] = set_bit (ctx->reg[RF], BF_C, a1);
+                ctx->reg[RA] = ((a1 << 7) | a2) & 0xFF;
+        }
+        else if (op == 0x1F) {
+                udo (&co, 1, 1);
+                a1 = ctx->reg[RA] & 0x01;
+                a2 = (ctx->reg[RF] & (1 << BF_C));
+                a2 = a2 >> BF_C;
+                ctx->reg[RA] = (a2 << 7) | (ctx->reg[RA] >> 1);
+                ctx->reg[RF] = set_bit (ctx->reg[RF], BF_C, a1);
+        }
+        else {
+                error ("Op code: %02X", op);
+                unreachable ();
+                err = 1;
+        }
+        if (err == 0) {
+                ctx->pc += co.po;
+                ctx->cycle += co.cd;
+        }
+        return err;
 }
 
 int
 rst (struct gbstate *ctx)
 {
+        (void)ctx;
         unreachable ();
 }
 
 int
 scf (struct gbstate *ctx)
 {
-        unreachable ();
+        set_flag (ctx, BF_C, 1);
+        set_flag (ctx, BF_N, 0);
+        set_flag (ctx, BF_H, 0);
+        ctx->pc += 1;
+        ctx->cycle += 1;
+        return 0;
 }
 
 int
 stop (struct gbstate *ctx)
 {
-        unreachable ();
+        (void)ctx;
+        return 0; // TODO: do later
 }
 
 int
 sub (struct gbstate *ctx)
 {
-        unreachable ();
+        (void)ctx;
+        /* unreachable (); */
+        return 0; // TODO: do later
 }
 
 int
 xor (struct gbstate *ctx)
 {
-        unreachable ();
+        assert (ctx);
+        int err = 0;
+        uint8_t op = ctx->ram[ctx->pc];
+        uint8_t gpr = 0;
+        uint8_t a1 = 0;
+        uint16_t aa1 = 0;
+        struct cpc co = {0};
+
+        switch (op) {
+                case 0xAE:
+                        udo (&co, 1, 2);
+                        aa1 = rpair (ctx, RH, RL);
+                        a1 = mem8 (ctx, aa1) ^ ctx->reg[RA];
+                        ctx->reg[RA] = a1;
+                        goto op_done_;
+                case 0xEE:
+                        udo (&co, 2, 2);
+                        a1 = imm8 (ctx) ^ ctx->reg[RA];
+                        ctx->reg[RA] = a1;
+                        goto op_done_;
+        }
+
+        if (inrange (op, 0xA8, 0xAF)) {
+                udo (&co, 1, 1);
+                gpr = (op & 0x0F) - 0x08;
+                a1 = ctx->reg[gpr] ^ ctx->reg[RA];
+                ctx->reg[RA] = a1;
+        }
+op_done_:
+        if (err == 0) {
+                ctx->pc += co.po;
+                ctx->cycle += co.cd;
+                set_flag (ctx, BF_Z, a1 == 0 ? 1 : 0);
+                set_flag (ctx, BF_N, 0);
+                set_flag (ctx, BF_H, 0);
+                set_flag (ctx, BF_C, 0);
+        }
+        return err;
 }

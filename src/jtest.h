@@ -17,6 +17,15 @@ RA,
 GPR_LEN,
 };
 
+enum BFLAGS {
+BF_C = 4,
+BF_H,
+BF_N,
+BF_Z,
+BFLAGS_LEN,
+BF_CY = 4, // alias for FC
+};
+
 // Hardware Register Addresses
 enum HRA {
 HRA_JOYP = 0xFF00,

@@ -5,8 +5,9 @@
 #include <stddef.h>
 #include "jtest.h"
 
+extern int show_completed; // whether to show passing test groups
+extern int show_individual; // how many of the individual tests to show
+
 void run_tests (void);
 void run_test (char *test_name);
-/* void run_test_group (char *file_name, struct sm83_test *tests, size_t tests_len); */
-/* int test_file_list(char **filenames, size_t *filecount); */
 #endif // TEST_H_

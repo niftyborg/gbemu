@@ -22,6 +22,9 @@ FSIM      = 1 << 0,
 FTEST     = 1 << 2,
 };
 
+int show_completed = 0;
+int show_individual = 0;
+
 int
 main(int argc, char **argv)
 {
@@ -29,7 +32,7 @@ main(int argc, char **argv)
     enum FLAGS f = {0};
     char *test_name = {0};
 
-    while ((opt = getopt(argc, argv, "st:")) != -1) {
+    while ((opt = getopt(argc, argv, "ast:c:")) != -1) {
         switch (opt) {
             case 's':
                 f |= FSIM;
@@ -37,6 +40,12 @@ main(int argc, char **argv)
             case 't':
                 test_name = strdup (optarg);
                 f |= FTEST;
+                break;
+            case 'a':
+                show_completed = 1;
+                break;
+            case 'c':
+                show_individual = atoi (optarg);
                 break;
             default:
                 error ("usage: %s [-t <test_name>] [-s]", argv[0]);

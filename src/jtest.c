@@ -9,7 +9,8 @@
 #include "util.h"
 
 static const int key_to_idx[256] = {
-    ['a'] = 0, ['f'] = 1, ['b'] = 2, ['c'] = 3, ['d'] = 4, ['e'] = 5, ['h'] = 6, ['l'] = 7
+    ['a'] = RA, ['f'] = RF, ['b'] = RB, ['c'] = RC, ['d'] = RD, ['e'] = RE,
+    ['h'] = RH, ['l'] = RL
 };
 
 void kvs_reset(struct kvs *kvs) {
@@ -100,7 +101,7 @@ int run_sm83_test(struct sm83_test t){
 }
 
 void sm83_test_dump(struct sm83_test *tests, size_t tests_len) {
-    for (size_t i = 0; i < tests_len && i < 10; i++) {
+    for (size_t i = 0; i < tests_len; i++) {
         printf("Name: %s\n", tests[i].name);
         printf("\tInitial KVs:");
         for (size_t j = 0; j < tests[i].initial.kvs.len; j++) {
@@ -240,7 +241,7 @@ int parse_file(char *file_path, struct sm83_test **sm83_tests, size_t *length) {
             kvs_append(&st.final.kvs, &kv);
         }
         // ram state
-        cJSON *final_ram = cJSON_GetObjectItemCaseSensitive(initial, "ram");
+        cJSON *final_ram = cJSON_GetObjectItemCaseSensitive(final, "ram");
         if (!cJSON_IsArray(final_ram)) {
             error("Missing 'final', malformed test file %s", file_path);
             err = 4;

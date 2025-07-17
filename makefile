@@ -8,10 +8,6 @@ else
 	CFLAGS+=-ggdb
 endif
 
-ifdef RUN_TESTS
-	CFLAGS+=-DRUN_TESTS
-endif
-
 ifdef STRICT
 CFLAGS+=-Wall -Wextra -Wpedantic -Werror -fanalyzer -fstack-protector-strong \
 		-D_FORTIFY_SOURCE=2
@@ -19,12 +15,14 @@ endif
 
 build: skeleton gbemu
 
-gbemu: gbemu.o cjson.o jtest.o util.o instr.o
+gbemu: gbemu.o cjson.o jtest.o util.o instr.o test.o sim.o
 	$(CC) $(CFLAGS) -o $(BUILD_DIR)/$@ $(BUILD_DIR)/objs/gbemu.o \
 		$(BUILD_DIR)/objs/cjson.o \
 		$(BUILD_DIR)/objs/jtest.o \
 		$(BUILD_DIR)/objs/util.o \
-		$(BUILD_DIR)/objs/instr.o
+		$(BUILD_DIR)/objs/test.o \
+		$(BUILD_DIR)/objs/instr.o \
+		$(BUILD_DIR)/objs/sim.o
 
 instr.o: src/instr.c
 	$(CC) $(CFLAGS) -c -o $(BUILD_DIR)/objs/$@ $<
@@ -35,7 +33,13 @@ gbemu.o: src/main.c
 jtest.o: src/jtest.c
 	$(CC) $(CFLAGS) -c -o $(BUILD_DIR)/objs/$@ $<
 
+test.o: src/test.c
+	$(CC) $(CFLAGS) -c -o $(BUILD_DIR)/objs/$@ $<
+
 cjson.o: vendor/cJSON/cJSON.c
+	$(CC) $(CFLAGS) -c -o $(BUILD_DIR)/objs/$@ $<
+
+sim.o: src/sim.c
 	$(CC) $(CFLAGS) -c -o $(BUILD_DIR)/objs/$@ $<
 
 util.o: src/util.h
